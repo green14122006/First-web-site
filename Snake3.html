@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Situn Monster Hunt</title>
+  <style>
+    body {
+      margin: 0;
+      background: black;
+      overflow: hidden;
+      touch-action: none;
+      user-select: none;
+      font-family: monospace;
+      color: white;
+      text-align: center;
+    }
+    canvas {
+      display: block;
+      background: #000;
+    }
+    #healthBar {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      width: 200px;
+      height: 25px;
+      border: 2px solid white;
+      background: #222;
+      z-index: 1000;
+    }
+    #healthBarInner {
+      height: 100%;
+      background: limegreen;
+      width: 100%;
+      transition: width 0.3s ease-in-out; /* smooth width change */
+    }
+    #restartBtn {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: crimson;
+      color: white;
+      border: none;
+      padding: 15px 30px;
+      font-size: 24px;
+      border-radius: 10px;
+      cursor: pointer;
+      display: none;
+      z-index: 1001;
+      box-shadow: 0 0 10px crimson;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+  <div id="healthBar">
+    <div id="healthBarInner"></div>
+  </div>
+  <button id="restartBtn">Restart Game</button>
+
+  <script>
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    const healthBarInner = document.getElementById("healthBarInner");
+    const restartBtn = document.getElementById("restartBtn");
+
+    let animationId;
+    let targetX, targetY;
+    let score, level, evolved, health;
+    let bones, bug, monsters, fires, sparkles;
+
+    function initGame() {
+      targetX = canvas.width / 2;
+      targetY = canvas.height / 2;
+      score = 0;
+      level = 1;
+      evolved = false;
+      health = 100;
+
+      bones = [];
+      const boneCount = 20;
+      for (let i = 0; i < boneCount; i++) {
+        bones.push({ x: targetX, y: targetY });
+      }
+
+      sparkles = [];
+
+      bug = { x: 0, y: 0, timer: 0 };
+      spawnBug();
+
+      monsters = [];
+      const monsterCount = 3;
+      for (let i = 0; i < monsterCount; i++) {
+        monsters.push({
+          x: Math.random() * canvas.width,
+          y: Math.random() * canvas.height,
+          size: 25,
+          speed: 1 + Math.random(),
+          alive: true
+        });
+      }
+
+      fires = [];
+
+      updateHealthBar();
+      restartBtn.style.display = "none";
+      animate();
+    }
+
+    function spawnBug() {
+      bug.x = Math.random() * canvas.width;
+      bug.y = Math.random() * canvas.height;
+      bug.timer = 300 - level * 20;
+    }
+
+    function updateHealthBar() {
+      healthBarInner.style.width = health + "%";
+      if (health > 60) healthBarInner.style.background = "limegreen";
+      else if (health > 30) healthBarInner.style.background = "orange";
+      else healthBarInner.style.background = "red";
+    }
+
+    function gameOver() {
+      cancelAnimationFrame(animationId);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "black";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.font = "50px serif";
+      ctx.fillStyle = "red";
+      ctx.shadowColor = "red";
+      ctx.fillText("💀 GAME OVER 💀", canvas.width / 2 - 150, canvas.height / 2);
+      ctx.font = "30px monospace";
+      ctx.fillText(`Final Score: ${score}`, canvas.width / 2 - 100, canvas.height / 2 + 60);
+      restartBtn.style.display = "block";
+    }
+
+    function createSparkle(x, y) {
+      for (let i = 0; i < 5; i++) {
+        sparkles.push({
+          x, y,
+          vx: Math.random() * 4 - 2,
+          vy: Math.random() * 4 - 2,
+          life: 30
+        });
+      }
+    }
+
+    canvas.addEventListener("touchmove", (e) => {
+      e.preventDefault();
+      const touch = e.touches[0];
+      targetX = touch.clientX;
+      targetY = touch.clientY;
+      createSparkle(targetX, targetY);
+    }, { passive: false });
+
+    canvas.addEventListener("touchstart", (e) => {
+      e.preventDefault();
+      if (evolved) {
+        const fireX = bones[0].x;
+        const fireY = bones[0].y;
+        fires.push({ x: fireX, y: fireY, vx: 0, vy: 0, alive: true });
+
+        const touch = e.touches[0];
+        const dx = touch.clientX - fireX;
+        const dy = touch.clientY - fireY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        fires[fires.length - 1].vx = (dx / dist) * 12;
+        fires[fires.length - 1].vy = (dy / dist) * 12;
+      }
+    }, { passive: false });
+
+    restartBtn.onclick = () => {
+      initGame();
+    };
+
+    function animate() {
+      animationId = requestAnimationFrame(animate);
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "rgba(0,0,0,0.25)";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Move bones
+      bones[0].x += (targetX - bones[0].x) * 0.2;
+      bones[0].y += (targetY - bones[0].y) * 0.2;
+      for (let i = 1; i < bones.length; i++) {
+        bones[i].x += (bones[i - 1].x - bones[i].x) * 0.4;
+        bones[i].y += (bones[i - 1].y - bones[i].y) * 0.4;
+      }
+
+      // Draw bones
+      for (let i = 0; i < bones.length; i++) {
+        ctx.beginPath();
+        ctx.arc(bones[i].x, bones[i].y, 10 - i * 0.3, 0, Math.PI * 2);
+        ctx.fillStyle = evolved ? "lime" : "cyan";
+        ctx.shadowColor = evolved ? "lime" : "cyan";
+        ctx.shadowBlur = 15;
+        ctx.fill();
+      }
+      // Eye glow
+      ctx.beginPath();
+      ctx.arc(bones[0].x + 7, bones[0].y - 5, 4, 0, Math.PI * 2);
+      ctx.fillStyle = evolved ? "gold" : "red";
+      ctx.shadowColor = evolved ? "gold" : "red";
+      ctx.shadowBlur = 12;
+      ctx.fill();
+
+      // Sparkles
+      for (let i = sparkles.length - 1; i >= 0; i--) {
+        const s = sparkles[i];
+        s.x += s.vx;
+        s.y += s.vy;
+        s.life--;
+        if (s.life <= 0) sparkles.splice(i, 1);
+        else {
+          ctx.beginPath();
+          ctx.arc(s.x, s.y, 2, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(255, 192, 203, ${s.life / 30})`;
+          ctx.fill();
+        }
+      }
+
+      // Bug draw & catch
+      ctx.beginPath();
+      ctx.arc(bug.x, bug.y, 7, 0, Math.PI * 2);
+      ctx.fillStyle = "lime";
+      ctx.shadowColor = "lime";
+      ctx.shadowBlur = 10;
+      ctx.fill();
+
+      const dxBug = bones[0].x - bug.x;
+      const dyBug = bones[0].y - bug.y;
+      if (Math.sqrt(dxBug * dxBug + dyBug * dyBug) < 15) {
+        score++;
+        level = Math.floor(score / 5) + 1;
+        if (score >= 10 && !evolved) evolved = true;
+        spawnBug();
+      }
+      bug.timer--;
+      if (bug.timer <= 0) spawnBug();
+
+      // Monsters chase Situn
+      monsters.forEach(monster => {
+        if (!monster.alive) return;
+
+        const dx = bones[0].x - monster.x;
+        const dy = bones[0].y - monster.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        monster.speed = 1 + 0.3 * level;
+        monster.x += (dx / dist) * monster.speed;
+        monster.y += (dy / dist) * monster.speed;
+
+        ctx.beginPath();
+        ctx.fillStyle = "darkred";
+        ctx.shadowColor = "red";
+        ctx.shadowBlur = 20;
+        ctx.arc(monster.x, monster.y, monster.size, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.fillStyle = "yellow";
+        ctx.arc(monster.x - 8, monster.y - 5, 5, 0, Math.PI * 2);
+        ctx.arc(monster.x + 8, monster.y - 5, 5, 0, Math.PI * 2);
+        ctx.fill();
+
+        if (dist < monster.size + 10) {
+          health -= 0.8;  // faster health decrease for visible effect
+          if (health < 0) health = 0;
+          updateHealthBar();
+          if (health === 0) gameOver();
+        }
+      });
+
+      // Fire attack
+      fires.forEach((fire, index) => {
+        if (!fire.alive) return;
+
+        fire.x += fire.vx;
+        fire.y += fire.vy;
+
+        ctx.beginPath();
+        ctx.fillStyle = "orange";
+        ctx.shadowColor = "orange";
+        ctx.shadowBlur = 15;
+        ctx.arc(fire.x, fire.y, 8, 0, Math.PI * 2);
+        ctx.fill();
+
+        if (fire.x < 0 || fire.x > canvas.width || fire.y < 0 || fire.y > canvas.height) {
+          fire.alive = false;
+        }
+
+        monsters.forEach(monster => {
+          if (!monster.alive) return;
+          const dx = fire.x - monster.x;
+          const dy = fire.y - monster.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < monster.size + 8) {
+            monster.alive = false;
+            fire.alive = false;
+            score += 3;
+          }
+        });
+      });
+
+      for (let i = fires.length - 1; i >= 0; i--) {
+        if (!fires[i].alive) fires.splice(i, 1);
+      }
+
+      if (monsters.every(m => !m.alive)) {
+        setTimeout(() => {
+          monsters.forEach(m => {
+            m.x = Math.random() * canvas.width;
+            m.y = Math.random() * canvas.height;
+            m.alive = true;
+          });
+        }, 3000);
+      }
+
+      ctx.font = "24px monospace";
+      ctx.fillStyle = "white";
+      ctx.shadowColor = "hotpink";
+      ctx.shadowBlur = 5;
+      ctx.fillText(`Score: ${score}`, 20, 40);
+      ctx.fillText(`Level: ${level}`, 20, 70);
+
+      if (evolved) {
+        ctx.font = "28px fantasy";
+        ctx.fillStyle = "lime";
+        ctx.shadowColor = "lime";
+        ctx.fillText("🧬 Situn Evolved!", canvas.width / 2 - 100, 40);
+      }
+    }
+
+    window.onload = () => {
+      initGame();
+    };
+
+    window.addEventListener("resize", () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      if (targetX > canvas.width) targetX = canvas.width / 2;
+      if (targetY > canvas.height) targetY = canvas.height / 2;
+    });
+  </script>
+</body>
+</html>
